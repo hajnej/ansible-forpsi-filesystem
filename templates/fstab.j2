@@ -1,0 +1,9 @@
+#{{ansible_managed}}
+{% for i in lvols %}
+/dev/{{vg}}/{{i.lv}}	{{i.mount}}	{{i.fstype}}	{{i.mountopts|default('defaults')}}	{{i.fs_freq|default(1)}}	{{i.fs_passno|default(2)}}
+{% endfor %}
+{% for i in ansible_mounts if i.mount == '/boot' %}
+{{i.device}}	{{i.mount}}	{{i.fstype}}	defaults	1	2
+{% endfor %}
+
+

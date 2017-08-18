@@ -1,0 +1,22 @@
+---
+- name: "Check mounted filesystems"
+  mount:
+    src: "/dev/{{vg}}/{{item.lv}}"
+    path: "{{item.mount}}"
+    fstype: "{{item.fstype}}"
+    dump: "{{item.fs_freq|default(1)}}"
+    passno: "{{item.fs_passno|default(2)}}"
+    state: "mounted"
+  when:
+  - item.fstype != "swap"
+  with_items:
+  - "{{lvols}}"
+  check_mode: "yes"
+  notify:
+  - "perform migration"
+#  register: migration_done
+
+#- name: "Migration not done, performing migration"
+#  include: "migration.yml"
+#  when: migration_done|changed
+  
