@@ -43,6 +43,10 @@ shrink_rootfs() {
   lvm lvreduce -f --config 'global {locking_type=1}' -l ${size} $root_dev
   e2fsck -f -y "$root_dev"
   resize2fs -f "$root_dev"
+  mount | grep -q /sysroot
+  if [ ! $? -eq 0 ]; then
+    mount /sysroot
+  fi
 }
 
 shrink_rootfs

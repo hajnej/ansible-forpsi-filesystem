@@ -6,6 +6,7 @@
     fstype: "{{item.fstype}}"
     dump: "{{item.fs_freq|default(1)}}"
     passno: "{{item.fs_passno|default(2)}}"
+    opts: "{{item.mountopts|default('defaults')}}"
     state: "mounted"
   when:
   - item.fstype != "swap"

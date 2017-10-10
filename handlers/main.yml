@@ -1,168 +1,190 @@
 ---
-# handlers file for forpsi-filesystem---
-- block:
-  - name: "Install dependencies"
-    yum:
-      name: "{{item}}"
-      state: "present"
-    with_items:
-    - "{{packages}}"
-  
-  - name: "Create dracut module directory"
-    file:
-      path: "{{dracut_module_dir}}"
-      state: "directory"
-      mode: 0755
-      owner: "root"
-      group: "root"
-  
-  - name: "Copy dracut module files"
-    copy:
-      src: "{{item}}"
-      dest: "{{dracut_module_dir}}/{{item}}"
-      mode: 0755
-      owner: "root"
-      group: "root"
-    with_items:
-    - "module-setup.sh"
-    - "fs_migration.sh"
-  
-  - name: "Regenerate initramfs"
-    command: "dracut -I grep -I date -I fsadm -I df -I mkswap -I mkfs -I mkfs.ext4 -I rsync -I resize2fs -a rescue -N --force"
-    changed_when: False
-  
-  - name: "Regenerate GRUB2 configuration"
-    command: "grub2-mkconfig -o /boot/grub2/grub.cfg"
-    changed_when: False
-  
-  - name: "Remove quiet and rhgb from kernel params"
-    command: "grubby --update-kernel=DEFAULT --remove-args='quiet rhgb'"
-    changed_when: False
-  
-  - name: "Reboot server"
-    shell: 'sleep 5 && systemctl reboot'
-    async: 1
-    poll: 0
-    ignore_errors: True
-  
-  - name: "Wait for target connection to become reachable/usable"
-    wait_for_connection:
-      delay: 30
-      timeout: 180
-  
-  - name: "Delete fs_migration dracut module"
-    file:
-      path: "{{dracut_module_dir}}"
-      state: "absent"
-  
-  - name: "Create default initramfs"
-    command: "dracut --force"
-    changed_when: False
-  
-  - name: "Create logical volumes"
-    lvol:
-      vg: "{{vg}}"
-      lv: "{{item.lv}}"
-      size: "{{item.size}}"
-      state: "present"
-    with_items:
-    - "{{lvols}}"
-  
-  - name: "Create filesystems"
-    filesystem:
-      dev: "/dev/{{vg}}/{{item.lv}}"
-      fstype: "{{item.fstype}}"
-    when:
-    - item.fstype != "swap"
-    with_items:
-    - "{{lvols}}"
-  
-  - name: "Create swap devices"
-    command: "mkswap /dev/{{vg}}/{{item.lv}}"
-    when:
-    - item.fstype == "swap"
-    with_items:
-    - "{{lvols}}"
-  
-  - name: "Create mountpoints"
-    mount:
-      src: "/dev/{{vg}}/{{item.lv}}"
-      path: "/mnt/newroot{{item.mount}}"
-      state: "mounted"
-      fstype: "{{item.fstype}}"
-    when:
-    - item.fstype != 'swap'
-    with_items:
-    - "{{lvols}}"
-  
-  - name: "Copy new GRUB2 environment configuration file"
-    template:
-      src: "grub.j2"
-      dest: "/etc/default/grub"
-      owner: "root"
-      group: "root"
-      mode: 0644
-  
-  - name: "Stop as much services as possible"
-    service:
-      state: "stopped"
-      name: "{{item}}"
-    with_items:
-    - "rsyslog"
-    - "crond"
-    - "postfix"
-    - "tuned"
-  
-  - name: "Sync old to new filesystem"
-    command: "rsync -ax / /mnt/newroot/"
-  
-  - name: "Force SeLinux relabel after reboot"
-    file:
-      path: "/mnt/newroot/.autorelabel"
-      state: "present"
-      owner: "root"
-      group: "root"
-      mode: 0644
-  
-  - name: "Copy new /etc/fstab"
-    template:
-      src: "fstab.j2"
-      dest: "/mnt/newroot/etc/fstab"
-      owner: "root"
-      group: "root"
-      mode: 0644
-  
-  - name: "Bind /dev /sys /proc and /boot filesystem"
-    mount:
-      src: "{{item.src}}"
-      path: "{{item.path}}"
-      fstype: "{{item.fstype}}"
-      opts: "bind"
-      state: "mounted"
-    with_items:
-    - "{{fs_to_bind}}"
-  
-  - name: "Generate new grub2 configuration"
-    command: "chroot /mnt/newroot 'grub2-mkconfig' -o /boot/grub2/grub.cfg"
-    changed_when: False
-  
-  - name: "Reboot server"
-    shell: 'sleep 5 && systemctl reboot'
-    async: 1
-    poll: 0
-    ignore_errors: true
-  
-  - name: "Wait for target connection to become reachable/usable"
-    wait_for_connection:
-      delay: 30
-      timeout: 180
-  
-  - name: "Remove old logical volumes"
-    lvol:
-      vg: "{{vg}}"
-      lv: "{{item.key}}"
-      state: "absent"
-      force: "yes"
-    with_dict:
-      "{{ansible_lvm.lvs}}"
+# handlers file for forpsi-filesystem
+- name: "Install dependencies"
+  yum:
+    name: "{{item}}"
+    state: "present"
+  with_items:
+  - "{{packages}}"
+  listen: "perform migration"
+
+- name: "Create dracut module directory"
+  file:
+    path: "{{dracut_module_dir}}"
+    state: "directory"
+    mode: 0755
+    owner: "root"
+    group: "root"
+  listen: "perform migration"
+
+- name: "Copy dracut module files"
+  copy:
+    src: "{{item}}"
+    dest: "{{dracut_module_dir}}/{{item}}"
+    mode: 0755
+    owner: "root"
+    group: "root"
+  with_items:
+  - "module-setup.sh"
+  - "fs_migration.sh"
+  listen: "perform migration"
+
+- name: "Regenerate initramfs"
+  command: "dracut -I grep -I date -I fsadm -I df -I mkswap -I mkfs -I mkfs.ext4 -I rsync -I resize2fs -a rescue -N --force"
+  changed_when: False
+  listen: "perform migration"
+
+- name: "Regenerate GRUB2 configuration"
+  command: "grub2-mkconfig -o /boot/grub2/grub.cfg"
+  changed_when: False
+  listen: "perform migration"
+
+- name: "Remove quiet and rhgb from kernel params"
+  command: "grubby --update-kernel=DEFAULT --remove-args='quiet rhgb'"
+  changed_when: False
+  listen: "perform migration"
+
+- name: "Reboot server"
+  shell: 'sleep 5 && systemctl reboot'
+  async: 1
+  poll: 0
+  ignore_errors: True
+  listen: "perform migration"
+
+- name: "Wait for target connection to become reachable/usable"
+  wait_for_connection:
+    delay: 30
+    timeout: 300
+  listen: "perform migration"
+
+- name: "Delete fs_migration dracut module"
+  file:
+    path: "{{dracut_module_dir}}"
+    state: "absent"
+  listen: "perform migration"
+
+- name: "Create default initramfs"
+  command: "dracut --force"
+  changed_when: False
+  listen: "perform migration"
+
+- name: "Create logical volumes"
+  lvol:
+    vg: "{{vg}}"
+    lv: "{{item.lv}}"
+    size: "{{item.size}}"
+    state: "present"
+  with_items:
+  - "{{lvols}}"
+  listen: "perform migration"
+
+- name: "Create filesystems"
+  filesystem:
+    dev: "/dev/{{vg}}/{{item.lv}}"
+    fstype: "{{item.fstype}}"
+  when:
+  - item.fstype != "swap"
+  with_items:
+  - "{{lvols}}"
+  listen: "perform migration"
+
+- name: "Create swap devices"
+  command: "mkswap /dev/{{vg}}/{{item.lv}}"
+  when:
+  - item.fstype == "swap"
+  with_items:
+  - "{{lvols}}"
+  listen: "perform migration"
+
+- name: "Create mountpoints"
+  mount:
+    src: "/dev/{{vg}}/{{item.lv}}"
+    path: "/mnt/newroot{{item.mount}}"
+    state: "mounted"
+    fstype: "{{item.fstype}}"
+  when:
+  - item.fstype != 'swap'
+  with_items:
+  - "{{lvols}}"
+  listen: "perform migration"
+
+- name: "Copy new GRUB2 environment configuration file"
+  template:
+    src: "grub.j2"
+    dest: "/etc/default/grub"
+    owner: "root"
+    group: "root"
+    mode: 0644
+  listen: "perform migration"
+
+- name: "Stop as much services as possible"
+  service:
+    state: "stopped"
+    name: "{{item}}"
+  with_items:
+  - "rsyslog"
+  - "crond"
+  - "postfix"
+  - "tuned"
+  listen: "perform migration"
+
+- name: "Sync old to new filesystem"
+  command: "rsync -ax / /mnt/newroot/"
+  listen: "perform migration"
+
+- name: "Force SeLinux relabel after reboot"
+  file:
+    path: "/mnt/newroot/.autorelabel"
+    state: "touch"
+    owner: "root"
+    group: "root"
+    mode: 0644
+  listen: "perform migration"
+
+- name: "Copy new /etc/fstab"
+  template:
+    src: "fstab.j2"
+    dest: "/mnt/newroot/etc/fstab"
+    owner: "root"
+    group: "root"
+    mode: 0644
+  listen: "perform migration"
+
+- name: "Bind /dev /sys /proc and /boot filesystem"
+  mount:
+    src: "{{item.src}}"
+    path: "{{item.path}}"
+    fstype: "{{item.fstype}}"
+    opts: "bind"
+    state: "mounted"
+  with_items:
+  - "{{fs_to_bind}}"
+  listen: "perform migration"
+
+- name: "Generate new grub2 configuration"
+  command: "chroot /mnt/newroot 'grub2-mkconfig' -o /boot/grub2/grub.cfg"
+  changed_when: False
+  listen: "perform migration"
+
+- name: "Reboot server"
+  shell: 'sleep 5 && systemctl reboot'
+  async: 1
+  poll: 0
+  ignore_errors: true
+  listen: "perform migration"
+
+- name: "Wait for target connection to become reachable/usable"
+  wait_for_connection:
+    delay: 30
+    timeout: 300
+  listen: "perform migration"
+
+- name: "Remove old logical volumes"
+  lvol:
+    vg: "{{vg}}"
+    lv: "{{item.key}}"
+    state: "absent"
+    force: "yes"
+  with_dict:
+    "{{ansible_lvm.lvs}}"
   listen: "perform migration"
