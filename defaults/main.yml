@@ -6,17 +6,15 @@ packages:
 
 vg: "vg"
 lvols:
-- { lv: "root", size: "1G", mount: "/", fstype: "ext4", fs_passno: 1, mountopts: "defaults,noatime" }
+- { lv: "root", size: "2G", mount: "/", fstype: "ext4", fs_passno: 1, mountopts: "defaults,noatime" }
 - { lv: "home", size: "1G", mount: "/home", fstype: "ext4", mountopts: "defaults,noatime,nodev,nosuid" }
 - { lv: "opt", size: "1G", mount: "/opt", fstype: "ext4", mountopts: "defaults,noatime,nodev" }
 - { lv: "tmp", size: "1G", mount: "/tmp", fstype: "ext4", mountopts: "defaults,noatime,nodev,nosuid,noexec" }
-- { lv: "var", size: "1G", mount: "/var", fstype: "ext4", mountopts: "defaults,noatime,nodev,noexec,nosuid" }
+- { lv: "var", size: "2G", mount: "/var", fstype: "ext4", mountopts: "defaults,noatime,nodev,noexec,nosuid" }
 - { lv: "varlog", size: "1G", mount: "/var/log", fstype: "ext4", mountopts: "defaults,noatime,nodev,noexec" }
-- { lv: "usr", size: "2G", mount: "/usr", fstype: "ext4", mountopts: "defaults,noatime,nodev" }
 - { lv: "swap", size: "2G", mount: "swap", fstype: "swap", fs_freq: 0, fs_passno: 0 }
-- { lv: "vartmp", size: "1G", mount: "/var/tmp", fstype: "ext4", mountopts: "defaults,noatime,nodev,noexec,nosuid" }
 
-fs_to_bind:
+pseudofs:
 - src: "/dev"
   path: "/mnt/newroot/dev"
   fstype: "devtmpfs"
@@ -26,6 +24,8 @@ fs_to_bind:
 - src: "/sys"
   path: "/mnt/newroot/sys"
   fstype: "sysfs"
+
+bootfs:
 - src: "/boot"
   path: "/mnt/newroot/boot"
   fstype: "ext4"
