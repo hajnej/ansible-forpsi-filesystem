@@ -167,6 +167,7 @@
     path: "/mnt/newroot/boot"
     fstype: "ext4"
     state: "mounted"
+    opts: "bind"
   listen: "perform migration"
 
 - name: "Generate new grub2 configuration"
